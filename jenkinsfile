@@ -1,0 +1,59 @@
+pipeline {
+    agent any
+    
+    environment {
+        SONAR_URL = 'http://13.38.126.22:9000'
+        SONAR_LOGIN = credentials('squ_6b7416ffa7f429c9876a0bce5ccc813ee64155d9') 
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout 'https://github.com/rambabukoppireddy/docker-project.git'
+                checkout scm
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                 sh 'mvn clean package sonar:sonar'
+           }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    // Run SonarQube analysis
+                    def scannerHome = tool name: 'SonarQube Scanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                    withSonarQubeEnv('SonarQube Scanner') {
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.host.url=${SONAR_URL} -Dsonar.login=${SONAR_LOGIN}"
+                    }
+                }
+            }
+        }
+        
+        stage('Quality Gate Check') {
+            steps {
+                script {
+                    // Check SonarQube quality gate status
+                    def qualityGate = waitForQualityGate()
+                    if (qualityGate.status != 'OK') {
+                        error "Quality Gate failed: ${qualityGate.status}"
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            steps {
+                // Deploy your code to the desired environment
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Cleanup or other post-pipeline tasks
+        }
+    }
+}
